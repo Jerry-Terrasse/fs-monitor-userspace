@@ -1,0 +1,31 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-O2",
+      "-target",
+      "bpf",
+      "-Wno-unknown-attributes",
+      "-D__TARGET_ARCH_x86",
+      "-idirafter",
+      "/usr/lib/llvm-14/lib/clang/14.0.0/include",
+      "-idirafter",
+      "/usr/local/include",
+      "-idirafter",
+      "/usr/include/x86_64-linux-gnu",
+      "-idirafter",
+      "/usr/include",
+      "-I./intelli_interface/include",
+      "-I./intelli_interface/include/vmlinux/x86",
+      "-I/home/ubuntu/fs-monitor-userspace",
+      "-c",
+      "-o",
+      "monitor.bpf.o",
+      "monitor.bpf.c"
+    ],
+    "directory": "/home/ubuntu/fs-monitor-userspace",
+    "file": "/home/ubuntu/fs-monitor-userspace/monitor.bpf.c",
+    "output": "/home/ubuntu/fs-monitor-userspace/monitor.bpf.o"
+  }
+]
