@@ -57,40 +57,6 @@ static void increase_record(int op_id, u64 op_time)
     ++recordp->ops_cnt[op_id];
     recordp->ops_time[op_id] += op_time;
     
-    // print summary
-    // char buffer[256];
-    // int len = 0;
-    // len += BPF_SNPRINTF(buffer + len, sizeof(buffer) - len, "pid %d, ", recordp->pid);
-    // for(size_t i = 0; i < NUM_OPERATIONS; ++i) {
-    //     len += BPF_SNPRINTF(buffer + len, sizeof(buffer) - len, "%s %d, ", op_names[i], recordp->ops_cnt[i]);
-    // }
-    // bpf_printk("%s\n", buffer);
-    // bpf_printk(
-    //     "pid %d, %s %d, %s %d, %s %d, "
-    //     "%s %d, %s %d, %s %d, %s %d, "
-    //     "%s %d, %s %d, %s %d, %s %d, "
-    //     "%s %d, %s %d, %s %d, %s %d\n",
-    //     recordp->pid,
-    //     op_names[0], recordp->ops_cnt[0],
-    //     op_names[1], recordp->ops_cnt[1],
-    //     op_names[2], recordp->ops_cnt[2],
-    //     op_names[3], recordp->ops_cnt[3],
-    //     op_names[4], recordp->ops_cnt[4],
-    //     op_names[5], recordp->ops_cnt[5],
-    //     op_names[6], recordp->ops_cnt[6],
-    //     op_names[7], recordp->ops_cnt[7],
-    //     op_names[8], recordp->ops_cnt[8],
-    //     op_names[9], recordp->ops_cnt[9],
-    //     op_names[10], recordp->ops_cnt[10],
-    //     op_names[11], recordp->ops_cnt[11],
-    //     op_names[12], recordp->ops_cnt[12],
-    //     op_names[13], recordp->ops_cnt[13],
-    //     op_names[14], recordp->ops_cnt[14]
-    // );
-
-    // in one line
-    // bpf_printk("pid %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d\n", recordp->pid, op_names[0], recordp->ops_cnt[0], op_names[1], recordp->ops_cnt[1], op_names[2], recordp->ops_cnt[2], op_names[3], recordp->ops_cnt[3], op_names[4], recordp->ops_cnt[4], op_names[5], recordp->ops_cnt[5], op_names[6], recordp->ops_cnt[6], op_names[7], recordp->ops_cnt[7], op_names[8], recordp->ops_cnt[8], op_names[9], recordp->ops_cnt[9], op_names[10], recordp->ops_cnt[10], op_names[11], recordp->ops_cnt[11], op_names[12], recordp->ops_cnt[12], op_names[13], recordp->ops_cnt[13], op_names[14], recordp->ops_cnt[14]);
-
     // 0 to 2
     // bpf_printk("pid %d, %s %d, %s %d, %s %d\n", recordp->pid, op_names[0], recordp->ops_cnt[0], op_names[1], recordp->ops_cnt[1], op_names[2], recordp->ops_cnt[2]);
     // 0 to 4
@@ -100,17 +66,12 @@ static void increase_record(int op_id, u64 op_time)
     // // 10 to 14
     // bpf_printk("pid %d, %s %d, %s %d, %s %d, %s %d, %s %d\n", recordp->pid, op_names[10], recordp->ops_cnt[10], op_names[11], recordp->ops_cnt[11], op_names[12], recordp->ops_cnt[12], op_names[13], recordp->ops_cnt[13], op_names[14], recordp->ops_cnt[14]);
 
-    // 0 to 7
-    // bpf_printk("pid %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d, %s %d\n", recordp->pid, op_names[0], recordp->ops_cnt[0], op_names[1], recordp->ops_cnt[1], op_names[2], recordp->ops_cnt[2], op_names[3], recordp->ops_cnt[3], op_names[4], recordp->ops_cnt[4], op_names[5], recordp->ops_cnt[5], op_names[6], recordp->ops_cnt[6], op_names[7], recordp->ops_cnt[7]);
-
     // only open, read, write
     bpf_printk("[COUNT] pid %d, %s %d, %s %d, %s %d", recordp->pid, op_names[5], recordp->ops_cnt[5], op_names[13], recordp->ops_cnt[13], op_names[14], recordp->ops_cnt[14]);
     // op_time
     // bpf_printk("[OTIME] pid %d, %s %llu, %s %llu, %s %llu", recordp->pid, op_names[5], recordp->ops_time[5], op_names[13], recordp->ops_time[13], op_names[14], recordp->ops_time[14]);
     // op_time (ns -> ms)
     bpf_printk("[OTIME] pid %d, %s %llums, %s %llums, %s %llums", recordp->pid, op_names[5], recordp->ops_time[5] / 1000000, op_names[13], recordp->ops_time[13] / 1000000, op_names[14], recordp->ops_time[14] / 1000000);
-    
-
     
     return;
 }
