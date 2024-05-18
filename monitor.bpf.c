@@ -12,10 +12,13 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 static const char* op_names[NUM_OPERATIONS] = {
     "lookup", "getattr", "rename", "setattr", "create", "open", "release", "getxattr", "mkdir", "unlink", "opendir", "readdir", "releasedir", "read", "write"
 };
+#define LOG_OP_NUM 5
+#define OP_MASK ((1 << LOG_OP_NUM) - 1)
 
 struct record {
     unsigned int pid;
     int ops_cnt[NUM_OPERATIONS];
+    __u64 ops_time[NUM_OPERATIONS];
 };
 
 struct {
@@ -25,19 +28,34 @@ struct {
     __type(value, struct record);
 } record_map SEC(".maps");
 
-static void increase_record(int op_id)
+struct timer_event {
+    __u64 timestamp;
+    // __u32 pid;
+    // __u32 operation;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_ENTRIES);
+    __type(key, __u32);
+    __type(value, struct timer_event);
+} timer_map SEC(".maps");
+
+static void increase_record(int op_id, __u64 op_time)
 {
     __u32 pid = (__u32)bpf_get_current_pid_tgid();
     struct record *recordp = bpf_map_lookup_elem(&record_map, &pid);
     if(!recordp) {
         struct record record = {};
         record.pid = pid;
-        ++record.ops_cnt[op_id];
+        record.ops_cnt[op_id] = 1;
+        record.ops_time[op_id] = op_time;
         bpf_map_update_elem(&record_map, &pid, &record, BPF_ANY);
         return;
     }
 
     ++recordp->ops_cnt[op_id];
+    recordp->ops_time[op_id] += op_time;
     
     // print summary
     // char buffer[256];
@@ -88,10 +106,37 @@ static void increase_record(int op_id)
     return;
 }
 
+static void timer_begin(int op_id)
+{
+    __u32 key = (__u32)bpf_get_current_pid_tgid();
+    key = (key << LOG_OP_NUM) | (op_id & OP_MASK);
+
+    struct timer_event event = {};
+    event.timestamp = bpf_ktime_get_ns();
+
+    bpf_map_update_elem(&timer_map, &key, &event, BPF_ANY);
+}
+
+static __u64 timer_end(int op_id)
+{
+    __u32 key = (__u32)bpf_get_current_pid_tgid();
+    key = (key << LOG_OP_NUM) | (op_id & OP_MASK);
+
+    struct timer_event *eventp = bpf_map_lookup_elem(&timer_map, &key);
+    if(!eventp) {
+        return 0;
+    }
+
+    __u64 delta = bpf_ktime_get_ns() - eventp->timestamp;
+    bpf_map_delete_elem(&timer_map, &key);
+    return delta;
+}
+
 // lookup
 // SEC("fentry/vfs_lookup")
 // int BPF_PROG(vfs_lookup, struct nameidata *nd, struct qstr *name)
 // {
+//     timer_begin(0);
 //     increase_record(0);
 //     return 0;
 // }
@@ -100,7 +145,14 @@ static void increase_record(int op_id)
 SEC("fentry/vfs_getattr")
 int BPF_PROG(vfs_getattr, struct path *path)
 {
-    increase_record(1);
+    timer_begin(1);
+    return 0;
+}
+SEC("fexit/vfs_getattr")
+int BPF_PROG(vfs_getattr_exit, struct path *path, long ret)
+{
+    __u64 op_time = timer_end(1);
+    increase_record(1, op_time);
     return 0;
 }
 
@@ -108,6 +160,7 @@ int BPF_PROG(vfs_getattr, struct path *path)
 SEC("fentry/vfs_rename")
 int BPF_PROG(vfs_rename, struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry)
 {
+    timer_begin(2);
     increase_record(2);
     return 0;
 }
@@ -116,6 +169,7 @@ int BPF_PROG(vfs_rename, struct inode *old_dir, struct dentry *old_dentry, struc
 // SEC("fentry/vfs_setattr")
 // int BPF_PROG(vfs_setattr, struct dentry *dentry, struct iattr *attr)
 // {
+//     timer_begin(3);
 //     increase_record(3);
 //     return 0;
 // }
@@ -124,6 +178,7 @@ int BPF_PROG(vfs_rename, struct inode *old_dir, struct dentry *old_dentry, struc
 SEC("fentry/vfs_create")
 int BPF_PROG(vfs_create, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
 {
+    timer_begin(4);
     increase_record(4);
     return 0;
 }
@@ -132,14 +187,16 @@ int BPF_PROG(vfs_create, struct inode *dir, struct dentry *dentry, umode_t mode,
 SEC("fentry/do_sys_openat2")
 int BPF_PROG(do_openat, int dfd, void *pathname, void *how)
 {
+    timer_begin(5);
     increase_record(5);
-	return 0;
+    return 0;
 }
 
 // release
 // SEC("fentry/vfs_release")
 // int BPF_PROG(vfs_release, struct inode *inode, struct file *filp)
 // {
+//     timer_begin(6);
 //     increase_record(6);
 //     return 0;
 // }
@@ -148,6 +205,7 @@ int BPF_PROG(do_openat, int dfd, void *pathname, void *how)
 SEC("fentry/vfs_getxattr")
 int BPF_PROG(vfs_getxattr, struct dentry *dentry, const char *name)
 {
+    timer_begin(7);
     increase_record(7);
     return 0;
 }
@@ -156,6 +214,7 @@ int BPF_PROG(vfs_getxattr, struct dentry *dentry, const char *name)
 SEC("fentry/vfs_mkdir")
 int BPF_PROG(vfs_mkdir, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
+    timer_begin(8);
     increase_record(8);
     return 0;
 }
@@ -164,14 +223,16 @@ int BPF_PROG(vfs_mkdir, struct inode *dir, struct dentry *dentry, umode_t mode)
 SEC("fentry/do_unlinkat")
 int BPF_PROG(do_unlinkat, int dfd, struct filename *name)
 {
+    timer_begin(9);
     increase_record(9);
-	return 0;
+    return 0;
 }
 
 // opendir
 SEC("fentry/vfs_open")
 int BPF_PROG(vfs_open, struct inode *inode, struct file *filp)
 {
+    timer_begin(10);
     increase_record(10);
     return 0;
 }
@@ -180,6 +241,7 @@ int BPF_PROG(vfs_open, struct inode *inode, struct file *filp)
 // SEC("fentry/vfs_readdir")
 // int BPF_PROG(vfs_readdir, struct file *file, struct dir_context *ctx)
 // {
+//     timer_begin(11);
 //     increase_record(11);
 //     return 0;
 // }
@@ -188,6 +250,7 @@ int BPF_PROG(vfs_open, struct inode *inode, struct file *filp)
 // SEC("fentry/vfs_releasedir")
 // int BPF_PROG(vfs_releasedir, struct inode *inode, struct file *filp)
 // {
+//     timer_begin(12);
 //     increase_record(12);
 //     return 0;
 // }
@@ -196,6 +259,7 @@ int BPF_PROG(vfs_open, struct inode *inode, struct file *filp)
 SEC("fentry/vfs_read")
 int BPF_PROG(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos)
 {
+    timer_begin(13);
     increase_record(13);
     return 0;
 }
@@ -204,6 +268,7 @@ int BPF_PROG(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos)
 SEC("fentry/vfs_write")
 int BPF_PROG(vfs_write, struct file *file, const char *buf, size_t count, loff_t *pos)
 {
+    timer_begin(14);
     increase_record(14);
     return 0;
 }
