@@ -18,32 +18,32 @@ static const char* op_names[NUM_OPERATIONS] = {
 struct record {
     unsigned int pid;
     int ops_cnt[NUM_OPERATIONS];
-    __u64 ops_time[NUM_OPERATIONS];
+    u64 ops_time[NUM_OPERATIONS];
 };
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, MAX_ENTRIES);
-    __type(key, __u32);
+    __type(key, u32);
     __type(value, struct record);
 } record_map SEC(".maps");
 
 struct timer_event {
-    __u64 timestamp;
-    // __u32 pid;
-    // __u32 operation;
+    u64 timestamp;
+    // u32 pid;
+    // u32 operation;
 };
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, MAX_ENTRIES);
-    __type(key, __u32);
+    __type(key, u32);
     __type(value, struct timer_event);
 } timer_map SEC(".maps");
 
-static void increase_record(int op_id, __u64 op_time)
+static void increase_record(int op_id, u64 op_time)
 {
-    __u32 pid = (__u32)bpf_get_current_pid_tgid();
+    u32 pid = (__u32)bpf_get_current_pid_tgid();
     struct record *recordp = bpf_map_lookup_elem(&record_map, &pid);
     if(!recordp) {
         struct record record = {};
@@ -117,7 +117,7 @@ static void increase_record(int op_id, __u64 op_time)
 
 static void timer_begin(int op_id)
 {
-    __u32 key = (__u32)bpf_get_current_pid_tgid();
+    u32 key = (__u32)bpf_get_current_pid_tgid();
     key = (key << LOG_OP_NUM) | (op_id & OP_MASK);
 
     struct timer_event event = {};
@@ -126,9 +126,9 @@ static void timer_begin(int op_id)
     bpf_map_update_elem(&timer_map, &key, &event, BPF_ANY);
 }
 
-static __u64 timer_end(int op_id)
+static u64 timer_end(int op_id)
 {
-    __u32 key = (__u32)bpf_get_current_pid_tgid();
+    u32 key = (__u32)bpf_get_current_pid_tgid();
     key = (key << LOG_OP_NUM) | (op_id & OP_MASK);
 
     struct timer_event *eventp = bpf_map_lookup_elem(&timer_map, &key);
@@ -136,7 +136,7 @@ static __u64 timer_end(int op_id)
         return 0;
     }
 
-    __u64 delta = bpf_ktime_get_ns() - eventp->timestamp;
+    u64 delta = bpf_ktime_get_ns() - eventp->timestamp;
     bpf_map_delete_elem(&timer_map, &key);
     return delta;
 }
@@ -150,7 +150,7 @@ static __u64 timer_end(int op_id)
 // SEC("fexit/vfs_lookup")
 // int BPF_PROG(vfs_lookup_exit, struct nameidata *nd, struct qstr *name, long ret)
 // {
-//     __u64 op_time = timer_end(0);
+//     u64 op_time = timer_end(0);
 //     increase_record(0, op_time);
 //     return 0;
 // }
@@ -165,7 +165,7 @@ int BPF_PROG(vfs_getattr, struct path *path)
 SEC("fexit/vfs_getattr")
 int BPF_PROG(vfs_getattr_exit, struct path *path, long ret)
 {
-    __u64 op_time = timer_end(1);
+    u64 op_time = timer_end(1);
     increase_record(1, op_time);
     return 0;
 }
@@ -180,7 +180,7 @@ int BPF_PROG(vfs_rename, struct inode *old_dir, struct dentry *old_dentry, struc
 SEC("fexit/vfs_rename")
 int BPF_PROG(vfs_rename_exit, struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry, long ret)
 {
-    __u64 op_time = timer_end(2);
+    u64 op_time = timer_end(2);
     increase_record(2, op_time);
     return 0;
 }
@@ -195,7 +195,7 @@ int BPF_PROG(vfs_rename_exit, struct inode *old_dir, struct dentry *old_dentry, 
 // SEC("fexit/vfs_setattr")
 // int BPF_PROG(vfs_setattr_exit, struct dentry *dentry, struct iattr *attr, long ret)
 // {
-//     __u64 op_time = timer_end(3);
+//     u64 op_time = timer_end(3);
 //     increase_record(3, op_time);
 //     return 0;
 // }
@@ -210,7 +210,7 @@ int BPF_PROG(vfs_create, struct inode *dir, struct dentry *dentry, umode_t mode,
 SEC("fexit/vfs_create")
 int BPF_PROG(vfs_create_exit, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl, long ret)
 {
-    __u64 op_time = timer_end(4);
+    u64 op_time = timer_end(4);
     increase_record(4, op_time);
     return 0;
 }
@@ -225,7 +225,7 @@ int BPF_PROG(do_openat, int dfd, void *pathname, void *how)
 SEC("fexit/do_sys_openat2")
 int BPF_PROG(do_openat_exit, int dfd, void *pathname, void *how, long ret)
 {
-    __u64 op_time = timer_end(5);
+    u64 op_time = timer_end(5);
     increase_record(5, op_time);
     return 0;
 }
@@ -240,7 +240,7 @@ int BPF_PROG(do_openat_exit, int dfd, void *pathname, void *how, long ret)
 // SEC("fexit/vfs_release")
 // int BPF_PROG(vfs_release_exit, struct inode *inode, struct file *filp, long ret)
 // {
-//     __u64 op_time = timer_end(6);
+//     u64 op_time = timer_end(6);
 //     increase_record(6, op_time);
 //     return 0;
 // }
@@ -255,7 +255,7 @@ int BPF_PROG(vfs_getxattr, struct dentry *dentry, const char *name)
 SEC("fexit/vfs_getxattr")
 int BPF_PROG(vfs_getxattr_exit, struct dentry *dentry, const char *name, long ret)
 {
-    __u64 op_time = timer_end(7);
+    u64 op_time = timer_end(7);
     increase_record(7, op_time);
     return 0;
 }
@@ -270,7 +270,7 @@ int BPF_PROG(vfs_mkdir, struct inode *dir, struct dentry *dentry, umode_t mode)
 SEC("fexit/vfs_mkdir")
 int BPF_PROG(vfs_mkdir_exit, struct inode *dir, struct dentry *dentry, umode_t mode, long ret)
 {
-    __u64 op_time = timer_end(8);
+    u64 op_time = timer_end(8);
     increase_record(8, op_time);
     return 0;
 }
@@ -285,7 +285,7 @@ int BPF_PROG(do_unlinkat, int dfd, struct filename *name)
 SEC("fexit/do_unlinkat")
 int BPF_PROG(do_unlinkat_exit, int dfd, struct filename *name, long ret)
 {
-    __u64 op_time = timer_end(9);
+    u64 op_time = timer_end(9);
     increase_record(9, op_time);
     return 0;
 }
@@ -300,7 +300,7 @@ int BPF_PROG(vfs_open, struct inode *inode, struct file *filp)
 SEC("fexit/vfs_open")
 int BPF_PROG(vfs_open_exit, struct inode *inode, struct file *filp, long ret)
 {
-    __u64 op_time = timer_end(10);
+    u64 op_time = timer_end(10);
     increase_record(10, op_time);
     return 0;
 }
@@ -315,7 +315,7 @@ int BPF_PROG(vfs_open_exit, struct inode *inode, struct file *filp, long ret)
 // SEC("fexit/vfs_readdir")
 // int BPF_PROG(vfs_readdir_exit, struct file *file, struct dir_context *ctx, long ret)
 // {
-//     __u64 op_time = timer_end(11);
+//     u64 op_time = timer_end(11);
 //     increase_record(11, op_time);
 //     return 0;
 // }
@@ -330,7 +330,7 @@ int BPF_PROG(vfs_open_exit, struct inode *inode, struct file *filp, long ret)
 // SEC("fexit/vfs_releasedir")
 // int BPF_PROG(vfs_releasedir_exit, struct inode *inode, struct file *filp, long ret)
 // {
-//     __u64 op_time = timer_end(12);
+//     u64 op_time = timer_end(12);
 //     increase_record(12, op_time);
 //     return 0;
 // }
@@ -345,7 +345,7 @@ int BPF_PROG(vfs_read, struct file *file, char *buf, size_t count, loff_t *pos)
 SEC("fexit/vfs_read")
 int BPF_PROG(vfs_read_exit, struct file *file, char *buf, size_t count, loff_t *pos, ssize_t ret)
 {
-    __u64 op_time = timer_end(13);
+    u64 op_time = timer_end(13);
     increase_record(13, op_time);
     return 0;
 }
@@ -360,7 +360,7 @@ int BPF_PROG(vfs_write, struct file *file, const char *buf, size_t count, loff_t
 SEC("fexit/vfs_write")
 int BPF_PROG(vfs_write_exit, struct file *file, const char *buf, size_t count, loff_t *pos, ssize_t ret)
 {
-    __u64 op_time = timer_end(14);
+    u64 op_time = timer_end(14);
     increase_record(14, op_time);
     return 0;
 }
