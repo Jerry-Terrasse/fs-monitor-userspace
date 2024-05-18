@@ -106,7 +106,11 @@ static void increase_record(int op_id, __u64 op_time)
     // only open, read, write
     bpf_printk("[COUNT] pid %d, %s %d, %s %d, %s %d", recordp->pid, op_names[5], recordp->ops_cnt[5], op_names[13], recordp->ops_cnt[13], op_names[14], recordp->ops_cnt[14]);
     // op_time
-    bpf_printk("[OTIME] pid %d, %s %llu, %s %llu, %s %llu", recordp->pid, op_names[5], recordp->ops_time[5], op_names[13], recordp->ops_time[13], op_names[14], recordp->ops_time[14]);
+    // bpf_printk("[OTIME] pid %d, %s %llu, %s %llu, %s %llu", recordp->pid, op_names[5], recordp->ops_time[5], op_names[13], recordp->ops_time[13], op_names[14], recordp->ops_time[14]);
+    // op_time (ns -> ms)
+    bpf_printk("[OTIME] pid %d, %s %llums, %s %llums, %s %llums", recordp->pid, op_names[5], recordp->ops_time[5] / 1000000, op_names[13], recordp->ops_time[13] / 1000000, op_names[14], recordp->ops_time[14] / 1000000);
+    
+
     
     return;
 }
