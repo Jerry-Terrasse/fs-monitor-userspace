@@ -26,6 +26,7 @@ struct {
     __uint(max_entries, MAX_ENTRIES);
     __type(key, u32);
     __type(value, struct record);
+    __uint(pinning, 1);
 } record_map SEC(".maps");
 
 struct timer_event {
